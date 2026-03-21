@@ -52,8 +52,6 @@ jobs:
               - sktime/base/**
               - sktime/transformations/**
   test:
-    needs: detect
-    if: ${{ fromJSON(needs.detect.outputs.module_changes) != '[]' }}
     name:
     strategy:
       fail-fast: false
@@ -69,7 +67,16 @@ jobs:
           - ubuntu-latest
           - ubuntu-22.04-arm
           - windows-latest
-        sktime-component: ${{ fromJSON(needs.detect.outputs.module_changes) }}
+        sktime-component:
+          - alignment
+          - classification
+          - clustering
+          - detection
+          - forecasting
+          - networks
+          - param_est
+          - regression
+          - transformations
     runs-on: ${{ matrix.operating-system }}
     steps:
       - name: checkout pull request branch

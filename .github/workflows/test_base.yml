@@ -19,9 +19,8 @@ jobs:
               - pyproject.toml
               - sktime/base/**
   test:
-    needs: detect
     name:
-    if: ${{ needs.detect.outputs.base == 'true' }}
+    if: true
     strategy:
       fail-fast: false
       matrix:
