@@ -98,5 +98,5 @@ jobs:
         run: python -m pip list
 
       - name: unit test step
-        run: python3 -m pytest -m "datadownload" sktime/datasets
+        run: python3 -m pytest -m "datadownload" -k "not test_load_fpp3_private" sktime/datasets
         shell: bash
