@@ -31,9 +31,8 @@ jobs:
               - sktime/tests/**
               - sktime/utils/**
   test_module:
-    needs: detect
     name:
-    if: ${{ needs.detect.outputs.other_change == 'true' }}
+    if: true
     strategy:
       fail-fast: false
       matrix:
