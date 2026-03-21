@@ -523,9 +523,8 @@ jobs:
     secrets: inherit
 
   test-datasets:
-    needs: detect
     name: datasets
-    if: ${{ needs.detect.outputs.datasets == 'true' }}
+    if: true
     uses: ./.github/workflows/test_datasets.yml
     secrets: inherit
 
