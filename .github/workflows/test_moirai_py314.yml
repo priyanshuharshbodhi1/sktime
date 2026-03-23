@@ -1,0 +1,38 @@
+name: moirai-py314-bug-check
+
+on:
+  push:
+    branches:
+      - ci/moirai-py314-bug-check
+  workflow_dispatch:
+
+jobs:
+  test-moirai-py314:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install sktime with dev dependencies
+        run: uv pip install .[dev]
+        env:
+          UV_SYSTEM_PYTHON: 1
+
+      - name: Install MOIRAIForecaster dependencies
+        run: |
+          python -c "from sktime.registry import deps; print('\n'.join(deps('MOIRAIForecaster', include_test_deps=True)))" > deps.txt
+          pip install -r deps.txt
+        continue-on-error: true
+
+      - name: Show dependencies
+        run: uv pip list
+
+      - name: Test MOIRAIForecaster on Python 3.14
+        run: python -c "from sktime.tests._test_vm import run_test_vm; run_test_vm('MOIRAIForecaster')"
