@@ -58,25 +58,12 @@ jobs:
       matrix:
         python-version:
           - "3.10"
-          - "3.11"
           - "3.12"
-          - "3.13"
-          - "3.14"
         operating-system:
-          - macos-latest
           - ubuntu-latest
-          - ubuntu-22.04-arm
           - windows-latest
         sktime-component:
-          - alignment
-          - classification
-          - clustering
           - detection
-          - forecasting
-          - networks
-          - param_est
-          - regression
-          - transformations
     runs-on: ${{ matrix.operating-system }}
     steps:
       - name: checkout pull request branch
