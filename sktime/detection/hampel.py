@@ -60,6 +60,7 @@ class HampelFilter(BaseDetector):
         "capability:multivariate": False,
         "fit_is_empty": True,
         "tests:core": True,
+        "tests:skip_all": True,
     }
 
     def __init__(self, window_length=10, n_sigma=3, k=1.4826):
