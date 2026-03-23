@@ -30,6 +30,26 @@ class HampelFilter(BaseDetector):
     ----------
     .. [1] Hampel F. R., "The influence curve and its role in robust estimation",
        Journal of the American Statistical Association, 69, 382-393, 1974
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from sktime.detection.hampel import HampelFilter
+    >>> X = pd.DataFrame([0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0])
+    >>> detector = HampelFilter(window_length=3)
+    >>> detector.fit_transform(X)
+       labels
+    0       0
+    1       0
+    2       0
+    3       1
+    4       0
+    5       0
+    6       0
+    7       0
+    8       1
+    9       0
+    10      0
     """
 
     _tags = {
