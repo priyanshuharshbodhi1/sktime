@@ -63,7 +63,15 @@ jobs:
           - ubuntu-latest
           - windows-latest
         sktime-component:
+          - alignment
+          - classification
+          - clustering
           - detection
+          - forecasting
+          - networks
+          - param_est
+          - regression
+          - transformations
     runs-on: ${{ matrix.operating-system }}
     steps:
       - name: checkout pull request branch
