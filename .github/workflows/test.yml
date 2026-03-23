@@ -2,11 +2,8 @@ name: Install and test
 
 on:
   push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -516,9 +513,8 @@ jobs:
     secrets: inherit
 
   test-datasets:
-    needs: detect
     name: datasets
-    if: ${{ needs.detect.outputs.datasets == 'true' }}
+    if: true
     uses: ./.github/workflows/test_datasets.yml
     secrets: inherit
 
