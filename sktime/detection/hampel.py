@@ -2,6 +2,8 @@
 
 __author__ = ["priyanshuharshbodhi1"]
 
+import numpy as np
+import pandas as pd
 
 from sktime.detection.base import BaseDetector
 
@@ -47,7 +49,39 @@ class HampelFilter(BaseDetector):
         super().__init__()
 
     def _predict(self, X):
-        raise NotImplementedError
+        """Find outlier positions in X.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+
+        Returns
+        -------
+        pd.Series of int
+            iloc positions of detected outliers.
+        """
+        Z = X.iloc[:, 0].to_numpy(dtype=float)
+        n = len(Z)
+        half = self.window_length // 2
+        outliers = []
+
+        for i in range(n):
+            if np.isnan(Z[i]):
+                continue
+            start = max(0, i - half)
+            end = min(n, i + half + 1)
+            window = Z[start:end]
+            window = window[~np.isnan(window)]
+            if len(window) == 0:
+                continue
+            median = np.median(window)
+            mad = np.median(np.abs(window - median))
+            if np.abs(Z[i] - median) > self.n_sigma * self.k * mad:
+                outliers.append(i)
+
+        if not outliers:
+            return self._empty_sparse()
+        return pd.Series(outliers)
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
