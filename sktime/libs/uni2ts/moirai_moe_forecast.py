@@ -42,21 +42,21 @@ if _check_soft_dependencies("torch", severity="none"):
 if _check_soft_dependencies("einops", severity="none"):
     from einops import rearrange, reduce, repeat
 
-if sys.version_info < (3, 14):
-    Input = _safe_import("gluonts.model.Input")
-    InputSpec = _safe_import("gluonts.model.InputSpec")
-    PyTorchPredictor = _safe_import("gluonts.torch.PyTorchPredictor")
-    AddObservedValuesIndicator = _safe_import(
-        "gluonts.transform.AddObservedValuesIndicator"
-    )
-    AsNumpyArray = _safe_import("gluonts.transform.AsNumpyArray")
-    ExpandDimArray = _safe_import("gluonts.transform.ExpandDimArray")
-    TestSplitSampler = _safe_import("gluonts.transform.TestSplitSampler")
-    TFTInstanceSplitter = _safe_import("gluonts.transform.split.TFTInstanceSplitter")
-else:
-    Input = InputSpec = PyTorchPredictor = None
-    AddObservedValuesIndicator = AsNumpyArray = ExpandDimArray = None
-    TestSplitSampler = TFTInstanceSplitter = None
+_gluonts_ok = sys.version_info < (3, 14)
+Input = _safe_import("gluonts.model.Input", condition=_gluonts_ok)
+InputSpec = _safe_import("gluonts.model.InputSpec", condition=_gluonts_ok)
+PyTorchPredictor = _safe_import("gluonts.torch.PyTorchPredictor", condition=_gluonts_ok)
+AddObservedValuesIndicator = _safe_import(
+    "gluonts.transform.AddObservedValuesIndicator", condition=_gluonts_ok
+)
+AsNumpyArray = _safe_import("gluonts.transform.AsNumpyArray", condition=_gluonts_ok)
+ExpandDimArray = _safe_import("gluonts.transform.ExpandDimArray", condition=_gluonts_ok)
+TestSplitSampler = _safe_import(
+    "gluonts.transform.TestSplitSampler", condition=_gluonts_ok
+)
+TFTInstanceSplitter = _safe_import(
+    "gluonts.transform.split.TFTInstanceSplitter", condition=_gluonts_ok
+)
 
 
 from sktime.libs.uni2ts.common.torch_util import safe_div

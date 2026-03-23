@@ -217,9 +217,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import sys
-
 from skbase.utils.dependencies import _check_soft_dependencies
 
-if sys.version_info < (3, 14) and _check_soft_dependencies("gluonts", severity="none"):
+if _check_soft_dependencies("gluonts", severity="none"):
     from sktime.libs.uni2ts.forecast import MoiraiForecast
