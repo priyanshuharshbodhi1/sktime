@@ -4,6 +4,7 @@ __author__ = ["priyanshuharshbodhi1"]
 
 __all__ = ["Chronos2Forecaster"]
 
+import numpy as np
 from skbase.utils.dependencies import _check_soft_dependencies
 
 from sktime.forecasting.base import BaseForecaster
@@ -124,3 +125,38 @@ class Chronos2Forecaster(BaseForecaster):
         "context_length": None,
         "cross_learning": False,
     }
+
+    def __init__(
+        self,
+        model_path: str = "amazon/chronos-2",
+        config: dict = None,
+        seed: int | None = None,
+        ignore_deps: bool = False,
+    ):
+        self.model_path = model_path
+        self.seed = seed
+        self._seed = np.random.randint(0, 2**31) if seed is None else seed
+        self.config = config
+        self.ignore_deps = ignore_deps
+
+        self._config = self._default_config.copy()
+        if config is not None:
+            self._config.update(config)
+
+        self.model_pipeline = None
+
+        if ignore_deps:
+            self.set_tags(python_dependencies=[])
+
+        super().__init__()
+
+    def __getstate__(self):
+        """Return state for pickling, excluding unpickleable model pipeline."""
+        state = self.__dict__.copy()
+        if hasattr(self, "model_pipeline"):
+            state["model_pipeline"] = None
+        return state
+
+    def __setstate__(self, state):
+        """Restore state from unpickled state dictionary."""
+        self.__dict__.update(state)
