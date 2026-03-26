@@ -8,6 +8,7 @@ import numpy as np
 from skbase.utils.dependencies import _check_soft_dependencies
 
 from sktime.forecasting.base import BaseForecaster
+from sktime.utils.singleton import _multiton
 
 if _check_soft_dependencies("torch", severity="none"):
     import torch
@@ -160,3 +161,50 @@ class Chronos2Forecaster(BaseForecaster):
     def __setstate__(self, state):
         """Restore state from unpickled state dictionary."""
         self.__dict__.update(state)
+
+    def _get_pipeline_kwargs(self):
+        return {
+            "pretrained_model_name_or_path": self.model_path,
+            "torch_dtype": self._config["torch_dtype"],
+            "device_map": self._config["device_map"],
+        }
+
+    def _get_unique_key(self):
+        kwargs = self._get_pipeline_kwargs()
+        return str(sorted(kwargs.items()))
+
+    def _load_pipeline(self):
+        return _CachedChronos2(
+            key=self._get_unique_key(),
+            chronos2_kwargs=self._get_pipeline_kwargs(),
+        ).load_from_checkpoint()
+
+    def _ensure_model_pipeline_loaded(self):
+        """Reload model pipeline if needed after unpickling."""
+        if not hasattr(self, "model_pipeline") or self.model_pipeline is None:
+            if hasattr(self, "_is_fitted") and self._is_fitted:
+                self.model_pipeline = self._load_pipeline()
+
+
+@_multiton
+class _CachedChronos2:
+    """Cached Chronos-2 model to ensure only one instance exists in memory.
+
+    Chronos-2 is a zero-shot model and immutable, so sharing the same instance
+    across multiple uses has no side effects.
+    """
+
+    def __init__(self, key, chronos2_kwargs):
+        self.key = key
+        self.chronos2_kwargs = chronos2_kwargs
+        self.model_pipeline = None
+
+    def load_from_checkpoint(self):
+        """Load Chronos-2 pipeline from pretrained checkpoint."""
+        if self.model_pipeline is not None:
+            return self.model_pipeline
+
+        from chronos import Chronos2Pipeline
+
+        self.model_pipeline = Chronos2Pipeline.from_pretrained(**self.chronos2_kwargs)
+        return self.model_pipeline
