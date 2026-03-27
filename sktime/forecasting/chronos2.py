@@ -185,6 +185,24 @@ class Chronos2Forecaster(BaseForecaster):
             if hasattr(self, "_is_fitted") and self._is_fitted:
                 self.model_pipeline = self._load_pipeline()
 
+    def _fit(self, y, X=None, fh=None):
+        """Fit the forecaster to training data.
+
+        Parameters
+        ----------
+        y : pd.DataFrame
+            Target time series.
+        X : pd.DataFrame, optional
+            Past exogenous covariates.
+        fh : ForecastingHorizon, optional
+
+        Returns
+        -------
+        self
+        """
+        self.model_pipeline = self._load_pipeline()
+        return self
+
 
 @_multiton
 class _CachedChronos2:
