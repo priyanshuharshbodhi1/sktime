@@ -203,6 +203,78 @@ class Chronos2Forecaster(BaseForecaster):
         self.model_pipeline = self._load_pipeline()
         return self
 
+    def _predict(self, fh, X=None):
+        """Forecast time series at future horizon.
+
+        Parameters
+        ----------
+        fh : ForecastingHorizon
+        X : pd.DataFrame, optional
+
+        Returns
+        -------
+        y_pred : pd.DataFrame
+        """
+        import pandas as pd
+
+        from sktime.forecasting.base import ForecastingHorizon
+
+        self._ensure_model_pipeline_loaded()
+        transformers.set_seed(self._seed)
+
+        prediction_length = int(max(fh.to_relative(self.cutoff)))
+
+        context_length = self._config["context_length"]
+        if context_length is None:
+            context_length = self.model_pipeline.model_context_length
+
+        _y = self._y.copy()
+        y_vals = _y.values.T
+
+        if y_vals.shape[1] > context_length:
+            y_vals = y_vals[:, -context_length:]
+
+        input_dict = {"target": y_vals}
+
+        predictions = self.model_pipeline.predict(
+            [input_dict],
+            prediction_length=prediction_length,
+            batch_size=self._config["batch_size"],
+            context_length=context_length,
+            cross_learning=self._config["cross_learning"],
+            limit_prediction_length=self._config["limit_prediction_length"],
+        )
+
+        pred_tensor = predictions[0]
+        quantiles = self.model_pipeline.quantiles
+        median_idx = quantiles.index(0.5)
+        point_forecast = pred_tensor[:, median_idx, :].numpy()
+
+        index = (
+            ForecastingHorizon(range(1, prediction_length + 1))
+            .to_absolute(self._cutoff)
+            ._values
+        )
+        pred_out = fh.get_expected_pred_idx(self._y, cutoff=self.cutoff)
+
+        pred_df = pd.DataFrame(
+            point_forecast.T,
+            index=index,
+            columns=self._y.columns,
+        )
+        pred_df.index.names = self._y.index.names
+
+        dateindex = pred_df.index.get_level_values(-1).map(lambda x: x in pred_out)
+        return pred_df.loc[dateindex]
+
+    @classmethod
+    def get_test_params(cls, parameter_set="default"):
+        """Return testing parameter settings for the estimator."""
+        return [
+            {"model_path": "amazon/chronos-2"},
+            {"model_path": "amazon/chronos-2", "seed": 42},
+        ]
+
 
 @_multiton
 class _CachedChronos2:
