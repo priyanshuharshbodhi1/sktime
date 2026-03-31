@@ -5,9 +5,10 @@ __author__ = ["priyanshuharshbodhi1"]
 __all__ = ["Chronos2Forecaster"]
 
 import numpy as np
+import pandas as pd
 from skbase.utils.dependencies import _check_soft_dependencies
 
-from sktime.forecasting.base import BaseForecaster
+from sktime.forecasting.base import BaseForecaster, ForecastingHorizon
 from sktime.utils.singleton import _multiton
 
 if _check_soft_dependencies("torch", severity="none"):
@@ -215,10 +216,6 @@ class Chronos2Forecaster(BaseForecaster):
         -------
         y_pred : pd.DataFrame
         """
-        import pandas as pd
-
-        from sktime.forecasting.base import ForecastingHorizon
-
         self._ensure_model_pipeline_loaded()
         transformers.set_seed(self._seed)
 
@@ -235,6 +232,13 @@ class Chronos2Forecaster(BaseForecaster):
             y_vals = y_vals[:, -context_length:]
 
         input_dict = {"target": y_vals}
+
+        if self._X is not None:
+            actual_len = y_vals.shape[1]
+            past_X = self._X.values[-actual_len:]
+            input_dict["past_covariates"] = {
+                col: past_X[:, i] for i, col in enumerate(self._X.columns)
+            }
 
         predictions = self.model_pipeline.predict(
             [input_dict],
