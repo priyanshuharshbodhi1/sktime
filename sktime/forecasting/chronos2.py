@@ -240,6 +240,18 @@ class Chronos2Forecaster(BaseForecaster):
                 col: past_X[:, i] for i, col in enumerate(self._X.columns)
             }
 
+        if X is not None:
+            if self._X is None:
+                raise ValueError(
+                    "X was not provided in fit but is provided in predict. "
+                    "To use future covariates, provide past covariate values "
+                    "in fit as well."
+                )
+            future_vals = X.values[:prediction_length]
+            input_dict["future_covariates"] = {
+                col: future_vals[:, i] for i, col in enumerate(X.columns)
+            }
+
         predictions = self.model_pipeline.predict(
             [input_dict],
             prediction_length=prediction_length,
