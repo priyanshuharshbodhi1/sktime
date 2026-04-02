@@ -204,6 +204,32 @@ class Chronos2Forecaster(BaseForecaster):
         self.model_pipeline = self._load_pipeline()
         return self
 
+    def predict(self, fh=None, X=None, y=None):
+        """Forecast time series at future horizon.
+
+        Parameters
+        ----------
+        fh : int, list, pd.Index or ForecastingHorizon, optional
+        X : time series in sktime compatible format, optional
+            Future exogenous covariates.
+        y : time series in sktime compatible format, optional
+            Historical values for global forecasting. If provided,
+            performs fit_predict on the new series.
+
+        Returns
+        -------
+        y_pred : time series in sktime compatible format
+        """
+        if self._fh is None and fh is not None:
+            _fh = fh
+        else:
+            _fh = self._fh
+
+        if y is not None:
+            return self.fit_predict(fh=_fh, X=X, y=y)
+
+        return super().predict(fh=fh, X=X)
+
     def _predict(self, fh, X=None):
         """Forecast time series at future horizon.
 
