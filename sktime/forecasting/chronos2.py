@@ -237,6 +237,8 @@ class Chronos2Forecaster(BaseForecaster):
         ----------
         fh : ForecastingHorizon
         X : pd.DataFrame, optional
+            Future exogenous covariates (known-future). Column names must be
+            a subset of X provided in fit.
 
         Returns
         -------
