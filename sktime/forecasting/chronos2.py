@@ -112,6 +112,7 @@ class Chronos2Forecaster(BaseForecaster):
         "capability:multivariate": True,
         "capability:insample": False,
         "capability:global_forecasting": True,
+        "capability:non_contiguous_X": False,
         "tests:vm": True,
         "tests:skip_by_name": [
             "test_persistence_via_pickle",
