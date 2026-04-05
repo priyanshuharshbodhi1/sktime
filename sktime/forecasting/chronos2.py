@@ -101,7 +101,7 @@ class Chronos2Forecaster(BaseForecaster):
     _tags = {
         "authors": ["priyanshuharshbodhi1"],
         "maintainers": ["priyanshuharshbodhi1"],
-        "python_dependencies": ["chronos"],
+        "python_dependencies": ["chronos-forecasting>=2.0.0"],
         "capability:exogenous": True,
         "requires-fh-in-fit": False,
         "X-y-must-have-same-index": False,
