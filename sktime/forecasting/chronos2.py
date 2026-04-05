@@ -109,7 +109,7 @@ class Chronos2Forecaster(BaseForecaster):
         "capability:pred_int": False,
         "y_inner_mtype": "pd.DataFrame",
         "X_inner_mtype": "pd.DataFrame",
-        "scitype:y": "both",
+        "capability:multivariate": True,
         "capability:insample": False,
         "capability:global_forecasting": True,
         "tests:vm": True,
