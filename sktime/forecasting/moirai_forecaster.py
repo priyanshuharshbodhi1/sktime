@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 from skbase.utils.dependencies import _check_soft_dependencies
 
@@ -20,7 +21,8 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
     checkpoint_path : str, default=None
         Path to the checkpoint of the model. Supported weights are available at [1]_.
     context_length : int, default=200
-        Length of the context window, time points the model will take as input for inference.
+        Length of the context window, time points the model will take as input for
+        inference.
     patch_size : int, default=32
         Time steps to perform patching with.
     num_samples : int, default=100
@@ -98,7 +100,8 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
         "X-y-must-have-same-index": True,
         "enforce_index_type": None,
         "capability:missing_values": False,
-        "capability:pred_int": False,
+        "capability:pred_int": True,
+        "capability:pred_int:insample": False,
         "X_inner_mtype": ["pd.DataFrame", "pd-multiindex", "pd_multiindex_hier"],
         "y_inner_mtype": [
             "pd.Series",
@@ -107,7 +110,6 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
             "pd_multiindex_hier",
         ],
         "capability:insample": False,
-        "capability:pred_int:insample": False,
         "capability:global_forecasting": True,
         # CI and test flags
         # -----------------
@@ -361,6 +363,230 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
         predictions = predictions.loc[pred_out]
         predictions.index = pred_out
         return predictions
+
+    def _predict_quantiles(self, fh, X, alpha):
+        """Compute/return prediction quantiles for a forecast.
+
+        private _predict_quantiles containing the core logic,
+            called from predict_quantiles and possibly predict_interval
+
+        State required:
+            Requires state to be "fitted".
+
+        Accesses in self:
+            Fitted model attributes ending in "_"
+            self.cutoff
+
+        Parameters
+        ----------
+        fh : guaranteed to be ForecastingHorizon
+            The forecasting horizon with the steps ahead to to predict.
+        X :  sktime time series object, optional (default=None)
+            guaranteed to be of an mtype in self.get_tag("X_inner_mtype")
+            Exogeneous time series to predict from.
+        alpha : list of float (guaranteed not None and floats in [0,1] interval)
+            A list of probabilities at which quantile forecasts are computed.
+
+        Returns
+        -------
+        quantiles : pd.DataFrame
+            Column has multi-index: first level is variable name from y in fit,
+                second level being the values of alpha passed to the function.
+            Row index is fh, with additional (upper) levels equal to instance levels,
+                    from y seen in fit, if y_inner_mtype is Panel or Hierarchical.
+            Entries are quantile forecasts, for var in col index,
+                at quantile probability in second col index, for the row index.
+        """
+        if fh is None:
+            fh = self.fh
+        fh = fh.to_relative(self.cutoff)
+
+        self.model.hparams.prediction_length = max(fh._values)
+
+        if min(fh._values) < 0:
+            raise NotImplementedError(
+                "The MORAI adapter is not supporting insample predictions."
+            )
+
+        _y = self._y.copy()
+        _X = None
+        if self._X is not None:
+            _X = self._X.copy()
+
+        # Zero shot case with X and fit data as context
+        _use_fit_data_as_context = False
+        if X is not None:
+            _use_fit_data_as_context = True
+
+        if isinstance(_y, pd.Series):
+            target = [_y.name]
+            _y, _is_converted_to_df = self._series_to_df(_y)
+        else:
+            target = _y.columns
+
+        # Store the original index and target name
+        self._target_name = target
+        self._len_of_targets = len(target)
+
+        target = [f"target_{i}" for i in range(self._len_of_targets)]
+        _y.columns = target
+
+        future_length = 0
+        feat_dynamic_real = None
+
+        if _X is not None:
+            feat_dynamic_real = [
+                f"feat_dynamic_real_{i}" for i in range(self._X.shape[1])
+            ]
+            _X.columns = feat_dynamic_real
+
+        pred_df = pd.concat([_y, _X], axis=1)
+        self._is_range_index = self.check_range_index(pred_df)
+        self._is_period_index = self.check_period_index(pred_df)
+
+        if _use_fit_data_as_context:
+            future_length = self._get_future_length(X)
+            first_seen_index = X.index[0]
+            X_to_extend = X.copy()
+            X_to_extend.columns = feat_dynamic_real
+            _X = pd.concat([_X, X_to_extend]).sort_index()
+            pred_df = pd.concat([_y, _X], axis=1).sort_index()
+            pred_df.fillna(0, inplace=True)
+        else:
+            if _X is not None:
+                future_length = len(_X.index.get_level_values(-1).unique()) - len(
+                    _y.index.get_level_values(-1).unique()
+                )
+            else:
+                future_length = 0
+
+        # check whether the index is a PeriodIndex
+        if isinstance(pred_df.index, pd.PeriodIndex):
+            time_idx = self.return_time_index(pred_df)
+            pred_df.index = time_idx.to_timestamp()
+            pred_df.index.freq = None
+
+        # Check if the index is a range index
+        if self._is_range_index:
+            pred_df.index = self.handle_range_index(pred_df.index)
+
+        _is_hierarchical = False
+        if pred_df.index.nlevels >= 3:
+            pred_df = self._convert_hierarchical_to_panel(pred_df)
+            _is_hierarchical = True
+
+        ds_test, df_config = self.create_pandas_dataset(
+            pred_df, target, feat_dynamic_real, future_length
+        )
+
+        predictor = self.model.create_predictor(batch_size=self.batch_size)
+        forecasts = predictor.predict(ds_test)
+        forecast_it = iter(forecasts)
+
+        # Extract quantiles from forecasts
+        quantiles_list = self._get_quantiles_df(forecast_it, df_config, alpha, fh)
+
+        if isinstance(_y.index.get_level_values(-1), pd.DatetimeIndex):
+            if isinstance(quantiles_list.index, pd.MultiIndex):
+                quantiles_list.index = quantiles_list.index.set_levels(
+                    levels=quantiles_list.index.get_level_values(-1)
+                    .to_timestamp()
+                    .unique(),
+                    level=-1,
+                )
+            else:
+                quantiles_list.index = quantiles_list.index.to_timestamp()
+
+        if _is_hierarchical:
+            quantiles_list = self._convert_panel_to_hierarchical(
+                quantiles_list, _y.index.names
+            )
+
+        pred_out = fh.get_expected_pred_idx(_y, cutoff=self.cutoff)
+
+        if self._is_range_index:
+            timepoints = self.return_time_index(quantiles_list)
+            timepoints = timepoints.to_timestamp()
+            timepoints = (timepoints - pd.Timestamp("2010-01-01")).map(
+                lambda x: x.days
+            ) + self.return_time_index(_y)[0]
+            if isinstance(quantiles_list.index, pd.MultiIndex):
+                quantiles_list.index = quantiles_list.index.set_levels(
+                    levels=timepoints.unique(), level=-1
+                )
+                # Convert str type to int
+                quantiles_list.index = quantiles_list.index.map(
+                    lambda x: (int(x[0]), x[1])
+                )
+            else:
+                quantiles_list.index = timepoints
+
+        if _use_fit_data_as_context:
+            quantiles_list = quantiles_list.loc[first_seen_index:]
+
+        quantiles_list = quantiles_list.loc[pred_out]
+        quantiles_list.index = pred_out
+
+        return quantiles_list
+
+    def _get_quantiles_df(self, forecast_iter, df_config, alpha, fh):
+        """Extract quantiles from forecast objects.
+
+        Parameters
+        ----------
+        forecast_iter : iterator
+            Iterator of forecast objects from predictor.predict()
+        df_config : dict
+            Configuration dictionary with target names and item_id info
+        alpha : list of float
+            List of quantile levels to compute
+        fh : ForecastingHorizon
+            Forecast horizon
+
+        Returns
+        -------
+        quantiles_df : pd.DataFrame
+            DataFrame with multi-index columns (target_name, alpha_value)
+        """
+
+        def handle_series_quantiles(forecast, target, alpha):
+            # Extract samples and compute quantiles for series
+            samples = forecast.samples  # shape: (num_samples, forecast_length)
+            # Compute quantiles: shape (len(alpha), forecast_length)
+            quantiles = np.quantile(samples, alpha, axis=0)
+            # Create DataFrame for series: quantiles.T shape (forecast_len, alpha)
+            cols = pd.MultiIndex.from_product([target, alpha])
+            return pd.DataFrame(quantiles.T, columns=cols)
+
+        def handle_panel_quantiles(forecasts_it, df_config, alpha):
+            # Convert all panel quantiles to a single panel dataframe
+            panels = []
+            target_name = df_config["target"][0]
+            for forecast in forecasts_it:
+                samples = forecast.samples  # shape: (num_samples, forecast_length)
+                quantiles = np.quantile(samples, alpha, axis=0)
+                # quantiles shape: (len(alpha), forecast_length)
+                # Create multi-index columns for (target, alpha)
+                cols = pd.MultiIndex.from_product([[target_name], alpha])
+                df = pd.DataFrame(quantiles.T, columns=cols)
+                # Create multi-index with item_id and timepoints
+                time_idx = np.arange(len(df))
+                df[df_config["item_id"]] = forecast.item_id
+                df[df_config["timepoints"]] = time_idx
+                df.set_index(
+                    [df_config["item_id"], df_config["timepoints"]], inplace=True
+                )
+                panels.append(df)
+            result = pd.concat(panels)
+            return result
+
+        forecasts = list(forecast_iter)
+
+        # Assuming all forecasts are either series or panel type.
+        if forecasts[0].item_id is None:
+            return handle_series_quantiles(forecasts[0], df_config["target"], alpha)
+        else:
+            return handle_panel_quantiles(forecasts, df_config, alpha)
 
     @classmethod
     def get_test_params(cls, parameter_set="default"):
