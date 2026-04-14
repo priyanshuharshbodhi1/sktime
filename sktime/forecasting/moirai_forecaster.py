@@ -20,7 +20,8 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
     checkpoint_path : str, default=None
         Path to the checkpoint of the model. Supported weights are available at [1]_.
     context_length : int, default=200
-        Length of the context window, time points the model will take as input for inference.
+        Length of the context window, time points the model will take as input
+        for inference.
     patch_size : int, default=32
         Time steps to perform patching with.
     num_samples : int, default=100
@@ -86,7 +87,7 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
             "gluonts",
             "torch",
             "einops",
-            "huggingface-hub",
+            "huggingface_hub",
             "hf-xet",
             "lightning",
             "hydra-core",
@@ -153,7 +154,7 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
             )
 
     # Apply a patch for redirecting imports to sktime.libs.uni2ts
-    if _check_soft_dependencies(["lightning", "huggingface-hub"], severity="none"):
+    if _check_soft_dependencies(["lightning", "huggingface_hub"], severity="none"):
         import sktime
         from sktime.libs.uni2ts.forecast import MoiraiForecast
 
