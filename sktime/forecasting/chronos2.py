@@ -114,10 +114,6 @@ class Chronos2Forecaster(BaseForecaster):
         "capability:global_forecasting": True,
         "capability:non_contiguous_X": False,
         "tests:vm": True,
-        "tests:skip_by_name": [
-            "test_persistence_via_pickle",
-            "test_save_estimators_to_file",
-        ],
     }
 
     _default_config = {
