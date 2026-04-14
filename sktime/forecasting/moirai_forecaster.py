@@ -164,6 +164,10 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
         @patch.dict("sys.modules", {"uni2ts": sktime.libs.uni2ts})
         def _instantiate_patched_model(self, model_kwargs):
             """Instantiate the model from the vendor package."""
+            import huggingface_hub.constants
+
+            huggingface_hub.constants.HF_HUB_DISABLE_XET = True
+
             from sktime.libs.uni2ts.forecast import MoiraiForecast
 
             if self.checkpoint_path.startswith("Salesforce"):
