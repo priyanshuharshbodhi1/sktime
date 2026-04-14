@@ -179,7 +179,9 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
                 model_kwargs["checkpoint_path"] = hf_hub_download(
                     repo_id=self.checkpoint_path, filename="model.ckpt"
                 )
-                return MoiraiForecast.load_from_checkpoint(**model_kwargs)
+                return MoiraiForecast.load_from_checkpoint(
+                    **model_kwargs, weights_only=False
+                )
 
     def _fit(self, y, X, fh):
         if fh is not None:

@@ -175,3 +175,16 @@ class MoiraiModule(
         distr_param = self.param_proj(reprs, patch_size)
         distr = self.distr_output.distribution(distr_param, loc=loc, scale=scale)
         return distr
+
+    @classmethod
+    def _load_as_pickle(cls, model, model_file, map_location, strict):
+        import torch
+
+        state_dict = torch.load(
+            model_file,
+            map_location=torch.device(map_location),
+            weights_only=False,
+        )
+        model.load_state_dict(state_dict, strict=strict)
+        model.eval()
+        return model
