@@ -156,7 +156,7 @@ class MOIRAIForecaster(_BaseGlobalForecaster):
 
     # Apply a patch for redirecting imports to sktime.libs.uni2ts
     if sys.version_info < (3, 14) and _check_soft_dependencies(
-        ["lightning", "huggingface-hub"], severity="none"
+        ["lightning", "huggingface_hub"], severity="none"
     ):
         import sktime
         from sktime.libs.uni2ts.forecast import MoiraiForecast
