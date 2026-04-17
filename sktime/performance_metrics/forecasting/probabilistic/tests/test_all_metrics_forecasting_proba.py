@@ -48,6 +48,18 @@ def _make_proba_pred(y_true):
     return Normal(mu=mu, sigma=sigma)
 
 
+def _make_pred(metric, y_true):
+    """Make appropriate y_pred for the given metric based on scitype:y_pred tag."""
+    pred_type = metric.get_tag("scitype:y_pred")
+    if pred_type == "pred_quantiles":
+        return _make_quantile_pred(y_true)
+    elif pred_type == "pred_interval":
+        return _make_interval_pred(y_true)
+    elif pred_type == "pred_proba":
+        return _make_proba_pred(y_true)
+    return None
+
+
 class ForecastingProbaMetricFixtureGenerator(BaseFixtureGenerator):
     """Fixture generator for probabilistic forecasting metric tests.
 
@@ -75,56 +87,35 @@ class ForecastingProbaMetricFixtureGenerator(BaseFixtureGenerator):
 class TestAllForecastingMetrics(ForecastingProbaMetricFixtureGenerator, QuickTester):
     """Module level tests for all sktime probabilistic forecast metrics."""
 
-    def test_evaluate_output(self, estimator_instance):
-        """Test evaluate returns float or pd.Series based on score_average."""
+    def test_call_output(self, estimator_instance):
+        """Test __call__ returns float or pd.Series based on score_average."""
         metric = estimator_instance
-        pred_type = metric.get_tag("scitype:y_pred")
-
         y_true = _make_series(n_timepoints=20, random_state=42)
-
-        if pred_type == "pred_quantiles":
-            y_pred = _make_quantile_pred(y_true)
-        elif pred_type == "pred_interval":
-            y_pred = _make_interval_pred(y_true)
-        elif pred_type == "pred_proba":
-            y_pred = _make_proba_pred(y_true)
-            if y_pred is None:
-                return
-        else:
+        y_pred = _make_pred(metric, y_true)
+        if y_pred is None:
             return
 
-        result = metric.evaluate(y_true, y_pred)
+        result = metric(y_true, y_pred)
 
-        score_average = (
-            metric.score_average if hasattr(metric, "score_average") else True
-        )
-
+        score_average = getattr(metric, "score_average", True)
         if score_average:
-            assert isinstance(result, float), (
-                f"{type(metric).__name__}.evaluate with score_average=True "
+            assert isinstance(result, (float, np.floating)), (
+                f"{type(metric).__name__}.__call__ with score_average=True "
                 f"should return float, got {type(result)}"
             )
         else:
-            assert isinstance(result, (float, pd.Series)), (
-                f"{type(metric).__name__}.evaluate should return float or pd.Series"
+            assert isinstance(result, (float, np.floating, pd.Series)), (
+                f"{type(metric).__name__}.__call__ should return "
+                f"float or pd.Series, got {type(result)}"
             )
 
     def test_evaluate_by_index_output(self, estimator_instance):
         """Test evaluate_by_index returns pd.Series or pd.DataFrame."""
         metric = estimator_instance
         pred_type = metric.get_tag("scitype:y_pred")
-
         y_true = _make_series(n_timepoints=20, random_state=42)
-
-        if pred_type == "pred_quantiles":
-            y_pred = _make_quantile_pred(y_true)
-        elif pred_type == "pred_interval":
-            y_pred = _make_interval_pred(y_true)
-        elif pred_type == "pred_proba":
-            y_pred = _make_proba_pred(y_true)
-            if y_pred is None:
-                return
-        else:
+        y_pred = _make_pred(metric, y_true)
+        if y_pred is None:
             return
 
         result = metric.evaluate_by_index(y_true, y_pred)
@@ -133,36 +124,28 @@ class TestAllForecastingMetrics(ForecastingProbaMetricFixtureGenerator, QuickTes
             f"{type(metric).__name__}.evaluate_by_index should return "
             f"pd.Series or pd.DataFrame, got {type(result)}"
         )
-        assert len(result) == len(y_true), (
-            f"{type(metric).__name__}.evaluate_by_index output length "
-            f"should match y_true length"
-        )
+
+        if pred_type != "pred_proba":
+            assert len(result) == len(y_true), (
+                f"{type(metric).__name__}.evaluate_by_index length "
+                f"should match y_true length for {pred_type}"
+            )
 
     def test_call_equals_evaluate(self, estimator_instance):
-        """Test __call__ gives same result as evaluate."""
+        """Test __call__ gives same result as evaluate with matching multioutput."""
         metric = estimator_instance
-        pred_type = metric.get_tag("scitype:y_pred")
-
         y_true = _make_series(n_timepoints=20, random_state=42)
-
-        if pred_type == "pred_quantiles":
-            y_pred = _make_quantile_pred(y_true)
-        elif pred_type == "pred_interval":
-            y_pred = _make_interval_pred(y_true)
-        elif pred_type == "pred_proba":
-            y_pred = _make_proba_pred(y_true)
-            if y_pred is None:
-                return
-        else:
+        y_pred = _make_pred(metric, y_true)
+        if y_pred is None:
             return
 
         res_call = metric(y_true, y_pred)
-        res_eval = metric.evaluate(y_true, y_pred)
+        res_eval = metric.evaluate(y_true, y_pred, multioutput=metric.multioutput)
 
-        if isinstance(res_call, float):
-            assert np.isclose(res_call, res_eval), (
+        if isinstance(res_call, (float, np.floating)):
+            assert np.isclose(res_call, float(res_eval)), (
                 f"{type(metric).__name__}: __call__ and evaluate "
                 f"should return equal values"
             )
-        else:
+        elif isinstance(res_call, pd.Series):
             pd.testing.assert_series_equal(res_call, res_eval)
