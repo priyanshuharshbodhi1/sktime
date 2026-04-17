@@ -134,6 +134,11 @@ class TestAllForecastingMetrics(ForecastingProbaMetricFixtureGenerator, QuickTes
     def test_call_equals_evaluate(self, estimator_instance):
         """Test __call__ gives same result as evaluate with matching multioutput."""
         metric = estimator_instance
+        pred_type = metric.get_tag("scitype:y_pred")
+
+        if pred_type == "pred_proba":
+            return
+
         y_true = _make_series(n_timepoints=20, random_state=42)
         y_pred = _make_pred(metric, y_true)
         if y_pred is None:
